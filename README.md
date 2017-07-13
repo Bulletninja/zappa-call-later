@@ -32,8 +32,8 @@ def test_function(_arg1, _arg2, _kwarg1=1, _kwarg2=2):
 
 call_later = CallLater()
 call_later.function = test_function
-call_later.args = (3, 4) //for the above function
-call_later.kwargs = {'_kwarg1': 11, '_kwarg2': 22} //for the above function
+call_later.args = (3, 4) # for the above function
+call_later.kwargs = {'_kwarg1': 11, '_kwarg2': 22} # for the above function
 call_later.time_to_run = timezone.now() + timedelta(minutes=8)
 call_later.save()
 ```
