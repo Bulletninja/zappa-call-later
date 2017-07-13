@@ -1,22 +1,27 @@
+import operator
 from datetime import timedelta
+from random import random, randint
 from unittest import TestCase
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from zappa_call_later.models import CallLater, run, events, check_now
+from zappa_call_later import models
+from zappa_call_later.models import CallLater, events, check_now, MAX_TIME, test_run
 
 
 def test_function(_arg1, _arg2, _kwarg1=1, _kwarg2=2):
     return _arg1, _arg2, _kwarg1, _kwarg2
 
+
 def test_function_advanced():
     test_function_advanced.val += 1
     return True
 
+
 class TestingZappaCallLater(TestCase):
 
-    def test_basic(self):
+    def test_picklefield(self):
 
         call_later = CallLater()
         call_later.function = test_function
@@ -40,11 +45,16 @@ class TestingZappaCallLater(TestCase):
         self.assertEquals(kwarg1, 11)
         self.assertEquals(kwarg2, 22)
 
+    def test_call_later(self):
 
+        class Mockedlogger:
+            logger_message = []
 
+            @staticmethod
+            def error(my_type):
+                Mockedlogger.logger_message.append(my_type)
 
-
-    def test_advanced(self):
+        models.logger = Mockedlogger
 
         test_function_advanced.val = 0
 
@@ -59,7 +69,7 @@ class TestingZappaCallLater(TestCase):
         # so we can check later it is deleted
         call_later_once_id = call_later_once.id
 
-        self.assertEquals(run(call_later_once, time_threshold), events['called_and_destroyed'])
+        self.assertEquals(test_run(call_later_once, time_threshold), events['called_and_destroyed'])
 
         # check deleted from db
         self.assertEquals(CallLater.objects.filter(id=call_later_once_id).count(), 0)
@@ -71,11 +81,12 @@ class TestingZappaCallLater(TestCase):
         call_later_twice.every = timedelta(seconds=1)
         call_later_twice.repeat = 2
         call_later_twice.save()
-        self.assertEquals(run(call_later_twice, time_threshold), events['will_be_called_in_future_again'])
+        self.assertEquals(test_run(call_later_twice, time_threshold), events['will_be_called_in_future_again'])
+        call_later_twice = CallLater.objects.get(id=call_later_twice.id)
         self.assertEquals(call_later_twice.time_to_run, time_threshold + call_later_twice.every)
         call_later_twice.time_to_run = time_threshold
         call_later_twice.save()
-        self.assertEquals(run(call_later_twice, time_threshold), events['called_and_destroyed'])
+        self.assertEquals(test_run(call_later_twice, time_threshold), events['called_and_destroyed'])
 
         call_later_many_but_has_expired_expired = CallLater()
         call_later_many_but_has_expired_expired.function = test_function_advanced
@@ -84,7 +95,7 @@ class TestingZappaCallLater(TestCase):
         call_later_many_but_has_expired_expired.repeat = 2
         call_later_many_but_has_expired_expired.every = timedelta(seconds=1)
         call_later_many_but_has_expired_expired.save()
-        self.assertEquals(run(call_later_many_but_has_expired_expired, time_threshold), events['called_and_expired'])
+        self.assertEquals(test_run(call_later_many_but_has_expired_expired, time_threshold), events['called_and_expired'])
 
         call_later_repeat = CallLater()
 
@@ -122,6 +133,93 @@ class TestingZappaCallLater(TestCase):
         # and as count = 0, the function should have been deleted:
         self.assertEquals(CallLater.objects.filter(id=call_later_repeat.id).count(), 0)
 
+        # when does not run within MAX_TIME
+        CallLater.objects.all().delete()
+        call_later_expires = CallLater()
+        retry_count = call_later_expires.timeout_retries
+        call_later_expires.when_check_if_failed = time_threshold + timedelta(seconds=MAX_TIME)
+        call_later_expires.time_to_run = time_threshold - timedelta(seconds=1)
+        call_later_expires.save()
+
+        Mockedlogger.logger_message = []
+
+        check_now(time_threshold + timedelta(seconds=MAX_TIME))
+        call_later_expires = CallLater.objects.get(id=call_later_expires.id)
+
+        self.assertTrue(models.events['failed to run before expired'] in Mockedlogger.logger_message[0])
+        self.assertEquals(CallLater.objects.count(), 1)
+
+        self.assertEquals(call_later_expires.timeout_retries, retry_count-1)
+
+        self.assertEquals(call_later_expires.problem, False)
+
+        call_later_expires.when_check_if_failed = time_threshold + timedelta(seconds=MAX_TIME)
+        call_later_expires.timeout_retries=0
+        call_later_expires.save()
+        Mockedlogger.logger_message = []
+        check_now(time_threshold + timedelta(seconds=MAX_TIME))
+
+        self.assertTrue(models.events['repeatedly failed'] in Mockedlogger.logger_message[0])
+        call_later_expires = CallLater.objects.get(id=call_later_expires.id)
+
+        self.assertEquals(call_later_expires.timeout_retries, 0)
+        self.assertEquals(call_later_expires.problem, True)
+
+    def test_many(self):
+        CallLater.objects.all().delete()
+
+        class Mockedlogger:
+            logger_message = []
+
+            @staticmethod
+            def error(my_type):
+                Mockedlogger.logger_message.append(my_type)
+
+        models.logger = Mockedlogger
+
+        time_start = timezone.now()
+
+        how_many = 40
+
+        time_period = 10
+
+        local_success_count = 0
+        local_fail_count = 0
+
+        for i in range(0, how_many):
+            call_later = CallLater()
+
+            call_later.time_to_run = time_start + timedelta(seconds=randint(0, time_period-1))
+            if random() > .5:
+                local_success_count += 1
+                call_later.function = SuccessFailsCount.add_success
+            else:
+                local_fail_count += 1
+                call_later.function = SuccessFailsCount.add_fail
+
+            call_later.function.args = (1, 2)
+            call_later.save()
+
+        for i in range(0, time_period):
+            check_now(time_start+timedelta(seconds=i))
+
+        self.assertEquals(SuccessFailsCount.successes, local_success_count)
+        self.assertEquals(CallLater.objects.all().count(), local_fail_count)
 
 
+
+
+
+class SuccessFailsCount:
+    successes = 0
+    fails = 0
+
+    @staticmethod
+    def add_success():
+        SuccessFailsCount.successes += 1
+
+    @staticmethod
+    def add_fail():
+        SuccessFailsCount.fails += 1
+        raise Exception()
 
