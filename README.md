@@ -8,8 +8,7 @@ A db driven way to run tasks at a future point in time, or at a regular interval
 pip install git+https://github.com/andytwoods/zappa-call-later.git
 ```
 To check for tasks every 4 minutes, add the below to zappa_settings.json:
-
-With 
+ 
 ```json
 {
   "dev": {
