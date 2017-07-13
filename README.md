@@ -3,7 +3,7 @@
 # Description
 A db driven way to run tasks at a future point in time, or at a regular interval, for Django Zappa projects (https://github.com/Miserlou/Zappa).
 
-# Installation
+## Installation
 
 To check for tasks every 4 minutes:
 
@@ -22,11 +22,10 @@ With
   }
 }
 ```
-
-# Usage
-```python
+## Usage
 Low level currently, where you create and save your tasks straight to db.
 
+```python
 def test_function(_arg1, _arg2, _kwarg1=1, _kwarg2=2):
     return _arg1, _arg2, _kwarg1, _kwarg2
 
