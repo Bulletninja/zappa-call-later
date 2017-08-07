@@ -148,6 +148,9 @@ def run(call_later_id, time_threshold):
     #attempt to call the function here
     try:
         call_later.function(*_args, **_kwargs)
+    except TypeError:
+        pass
+        #  has been manually deleted    
     except Exception as e:
         if call_later.retries == 0:
             call_later.problem = True
