@@ -9,5 +9,5 @@ setup(
     license='MIT License',
     author='andytwoods',
     author_email='andytwoods@gmail.com',
-    description='tore future tasks in the db and call them after set delays'
+    description='store future tasks in the db and call them after set delays'
 )
