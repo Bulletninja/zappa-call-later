@@ -9,13 +9,16 @@ pip install zappa-call-later
 ```
 To check for tasks every 4 minutes, add the below to zappa_settings.json:
  
-```json
+```python
+
+from zappa_call_later.models import check_now
+
 {
   "dev": {
     "keep_warm": false,
     "events": [
       {
-        "function": src,
+        "function": check_now,
         "expression": "rate(4 minute)"
       }
     ]
