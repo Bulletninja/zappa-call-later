@@ -12,7 +12,6 @@ To check for tasks every 4 minutes, add the below to zappa_settings.json:
 ```json
 {
   "dev": {
-   # ...
     "keep_warm": false,
     "events": [
       {
@@ -38,7 +37,7 @@ call_later.time_to_run = timezone.now() + timedelta(minutes=8)
 call_later.save()
 ```
 
-You can also repeatedly call your task 
+You can also repeatedly call your task:
 ```python
 call_later_twice.every = timedelta(seconds=1)
 call_later_twice.repeat = 2
@@ -48,4 +47,4 @@ There are 2 types of failure:
 - If a task fails to run, it is run on the next checking event. By default, there are 3 attempts to run a function.
 - If a task takes too long to run, it is again run on the next checking event. By default, there are 3 retries.
 
-The task is eventually labelled as problematic.
+...the task is labelled as problematic after repeated fails.
