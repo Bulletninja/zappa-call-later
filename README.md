@@ -12,7 +12,7 @@ To check for tasks every 4 minutes, add the below to zappa_settings.json:
 ```json
 {
   "dev": {
-    ...
+   # ...
     "keep_warm": false,
     "events": [
       {

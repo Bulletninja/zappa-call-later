@@ -2,6 +2,10 @@ import inspect
 import json
 from datetime import timedelta
 from logging import getLogger
+
+import pytz
+from dateutil.parser import parse
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
 from django.utils import timezone
@@ -9,6 +13,7 @@ from django.db import models
 from django.utils.encoding import python_2_unicode_compatible
 from picklefield import PickledObjectField
 from zappa.async import task
+
 
 logger = getLogger(__name__)
 
@@ -36,9 +41,10 @@ def far_future_fail_timeout():
 def realistic_timeout(time_threshold):
     return time_threshold + timedelta(MAX_TIME)
 
+
 @python_2_unicode_compatible
 class CallLater(models.Model):
-    name = models.CharField( max_length=64, default='', editable=True, verbose_name=u'additional lookup field')
+    name = models.CharField(max_length=64, default='', editable=True, verbose_name=u'additional lookup field')
     time_to_run = models.DateTimeField(default=timezone.now)
     time_to_stop = models.DateTimeField(null=True, blank=True)
     function = PickledObjectField()
@@ -58,6 +64,10 @@ class CallLater(models.Model):
             raise ValidationError('you must set a repeat time (via every=[timedelta]) if you want a function called many times'
                                   ' (each time after current time + repeat')
         super(CallLater, self).save(*args, **kwargs)
+
+    def check_individual(self):
+        preprocess_instance(self, timezone.now())
+
 
 
 #used for testing
@@ -83,7 +93,6 @@ def check_now(timenow=timezone.now()):
 
     for timedout_again_to_run in CallLater.objects.filter(when_check_if_failed__lte=timenow,
                                                           problem=False):
-
         if timedout_again_to_run.timeout_retries == 0:
             timedout_again_to_run.problem = True
             timedout_again_to_run.save()
@@ -99,7 +108,7 @@ def check_now(timenow=timezone.now()):
 def preprocess_instance(to_run, time_threshold):
     to_run.when_check_if_failed = realistic_timeout(time_threshold)
     to_run.save()
-    run(to_run.id, time_threshold)
+    run(to_run.id, time_threshold.strftime("%Y-%m-%d %H:%M:%S"))
 
 
 def log_error(message, instance):
@@ -125,12 +134,14 @@ def log_error(message, instance):
 
 
 def test_run(call_later, time_threshold):
-    return run(call_later.id, time_threshold)
+    return run(call_later.id, time_threshold.astimezone().isoformat())
 
 
 # using id to avoid pickle issues
-@task
-def run(call_later_id, time_threshold):
+#  @task
+def run(call_later_id, time_threshold_txt):
+    time_threshold = parse(time_threshold_txt)
+
     try:
         call_later = CallLater.objects.get(id=call_later_id)
     except CallLater.DoesNotExist:
@@ -148,9 +159,9 @@ def run(call_later_id, time_threshold):
     #attempt to call the function here
     try:
         call_later.function(*_args, **_kwargs)
-    except TypeError:
+    except TypeError as e:
         pass
-        #  has been manually deleted    
+        #  has been manually deleted
     except Exception as e:
         if call_later.retries == 0:
             call_later.problem = True
@@ -172,12 +183,18 @@ def run(call_later_id, time_threshold):
 
     if call_later.every is not None:
         call_later.repeat -= 1
-        call_later.time_to_run = time_threshold + call_later.every
+
+        time_to_run = time_threshold + call_later.every
+        if time_to_run.tzinfo is None or time_to_run.tzinfo.utcoffset(time_to_run) is None:
+            time_to_run = pytz.timezone(settings.TIME_ZONE).localize(time_to_run)
+
+        call_later.time_to_run = time_to_run
         call_later.when_check_if_failed = far_future_fail_timeout()
         call_later.save()
         return events['will_be_called_in_future_again']
 
     return events['called']
+
 
 
 

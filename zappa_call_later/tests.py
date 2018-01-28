@@ -139,12 +139,18 @@ class TestingZappaCallLater(TestCase):
         retry_count = call_later_expires.timeout_retries
         call_later_expires.when_check_if_failed = time_threshold + timedelta(seconds=MAX_TIME)
         call_later_expires.time_to_run = time_threshold - timedelta(seconds=1)
+
+
+
+        call_later_expires.function = raise_an_error
         call_later_expires.save()
+        call_later_expires_id = call_later_expires.id
 
         Mockedlogger.logger_message = []
 
         check_now(time_threshold + timedelta(seconds=MAX_TIME))
-        call_later_expires = CallLater.objects.get(id=call_later_expires.id)
+
+        call_later_expires = CallLater.objects.get(id=call_later_expires_id)
 
         self.assertTrue(models.events['failed to run before expired'] in Mockedlogger.logger_message[0])
         self.assertEquals(CallLater.objects.count(), 1)
@@ -207,9 +213,6 @@ class TestingZappaCallLater(TestCase):
         self.assertEquals(CallLater.objects.all().count(), local_fail_count)
 
 
-
-
-
 class SuccessFailsCount:
     successes = 0
     fails = 0
@@ -223,3 +226,6 @@ class SuccessFailsCount:
         SuccessFailsCount.fails += 1
         raise Exception()
 
+
+def raise_an_error():
+    raise ValueError('A very specific bad thing happened')
