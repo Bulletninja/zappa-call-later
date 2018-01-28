@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from zappa_call_later.models import check_now
+from src.models import check_now
 
 
 class Command(BaseCommand):

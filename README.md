@@ -15,7 +15,7 @@ To check for tasks every 4 minutes, add the below to zappa_settings.json:
     "keep_warm": false,
     "events": [
       {
-        "function": "zappa_call_later.zappa_check.now",
+        "function": src,
         "expression": "rate(4 minute)"
       }
     ]

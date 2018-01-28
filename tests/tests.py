@@ -5,8 +5,8 @@ from unittest import TestCase
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from zappa_call_later import models
-from zappa_call_later.models import CallLater, events, check_now, MAX_TIME, test_run
+from src import models
+from src.models import CallLater, events, check_now, MAX_TIME, test_run
 
 
 def test_function(_arg1, _arg2, _kwarg1=1, _kwarg2=2):
