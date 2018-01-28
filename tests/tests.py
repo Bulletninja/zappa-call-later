@@ -1,4 +1,3 @@
-import operator
 from datetime import timedelta
 from random import random, randint
 from unittest import TestCase
