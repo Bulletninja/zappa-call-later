@@ -1,10 +1,10 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='zappa-call-later',
     version='1.0.0',
-    packages=['tests_project'],
-    package_dir={'': 'tests/tests_project'},
+    packages=find_packages('src'),
+    package_dir={'':'src'},
     url='https://github.com/andytwoods/zappa-call-later',
     license='MIT License',
     author='andytwoods',
